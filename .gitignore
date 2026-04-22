@@ -13,9 +13,11 @@
 *.userprefs
 
 # NuGet and tooling artifacts
+nupkg/
 *.nupkg
 *.snupkg
 packages/
+
 
 # Logs and temp files
 *.log

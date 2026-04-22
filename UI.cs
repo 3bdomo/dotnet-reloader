@@ -27,9 +27,11 @@ public static class Ui
     public static void PrintConfig(ReloaderConfig config)
     {
         SetColor(ConsoleColor.DarkGray);
-        Console.WriteLine($"  Project  : {config.ProjectPath}");
+        Console.WriteLine($"  Watch    : {config.WatchPath}");
+        if (!string.Equals(config.WatchPath, config.ProjectPath, StringComparison.OrdinalIgnoreCase))
+            Console.WriteLine($"  Project  : {config.ProjectPath}");
         Console.WriteLine($"  Delay    : {config.DebounceSeconds}s");
-        Console.WriteLine($"  Watch    : {string.Join(", ", config.WatchExtensions)}");
+        Console.WriteLine($"  Ext      : {string.Join(", ", config.WatchExtensions)}");
         Console.WriteLine($"  Ignore   : {string.Join(", ", config.IgnoreFolders)}");
         Console.WriteLine(Separator);
         Reset();

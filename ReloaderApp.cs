@@ -10,16 +10,12 @@ public class ReloaderApp
     private readonly object _lock = new();
     private bool _isBuilding = false;
 
-    // KEY FIX: track when the last build completed.
-    // Any FSW event whose file was last modified BEFORE this timestamp is a build artifact — ignore it.
     private DateTime _lastBuildCompletedAt = DateTime.MinValue;
     private static readonly TimeSpan PostBuildGrace = TimeSpan.FromSeconds(2);
 
-    // Dedup: FSW fires 2-3x per save for the same file — suppress within this window
     private readonly Dictionary<string, DateTime> _lastEventTime = new();
     private static readonly TimeSpan DuplicateWindow = TimeSpan.FromMilliseconds(300);
 
-    // Resolved absolute ignored paths
     private string[] _ignoredPaths = [];
 
     public ReloaderApp(string[] args)
@@ -34,32 +30,39 @@ public class ReloaderApp
         Ui.PrintBanner();
         Ui.PrintConfig(_config);
 
-        if (!Directory.Exists(_config.ProjectPath))
+        if (!Directory.Exists(_config.WatchPath))
         {
-            Ui.Error($"Project path not found: {_config.ProjectPath}");
+            Ui.Error($"Path not found: {_config.WatchPath}");
             Environment.Exit(1);
         }
 
+        if (!Directory.Exists(_config.ProjectPath))
+        {
+            Ui.Error($"Project not found: {_config.ProjectPath}");
+            Environment.Exit(1);
+        }
+
+        // Ignore folders are relative to WatchPath
         _ignoredPaths = _config.IgnoreFolders
-            .Select(f => Path.GetFullPath(Path.Combine(_config.ProjectPath, f)))
+            .Select(f => Path.GetFullPath(Path.Combine(_config.WatchPath, f)))
             .ToArray();
 
         await BuildAndRunAsync();
 
         using var watcher = CreateWatcher();
-        Ui.WatchingMessage(_config.ProjectPath);
+        Ui.WatchingMessage(_config.WatchPath);
 
         await Task.Delay(Timeout.Infinite);
     }
 
     private FileSystemWatcher CreateWatcher()
     {
-        var watcher = new FileSystemWatcher(_config.ProjectPath)
+        // Watch the solution root so changes anywhere in the solution are detected
+        var watcher = new FileSystemWatcher(_config.WatchPath)
         {
             NotifyFilter = NotifyFilters.LastWrite | NotifyFilters.FileName | NotifyFilters.DirectoryName,
             IncludeSubdirectories = true,
             EnableRaisingEvents = true,
-            // Increase buffer to avoid missing events on large projects
             InternalBufferSize = 65536
         };
 
@@ -90,33 +93,20 @@ public class ReloaderApp
         TriggerDebounce(e.FullPath, "Renamed");
     }
 
-    /// <summary>
-    /// Rejects events on files whose LastWriteTime predates or falls within
-    /// the post-build grace window. These are artifacts written by dotnet build,
-    /// not by the developer. This is the primary loop-breaker.
-    /// </summary>
     private bool IsPostBuildNoise(string path)
     {
-        // If no build has run yet, nothing to filter
         if (_lastBuildCompletedAt == DateTime.MinValue) return false;
 
         var cutoff = _lastBuildCompletedAt.Add(PostBuildGrace);
-
-        // Event arrived within the grace window after build finished → noise
         if (DateTime.UtcNow < cutoff) return true;
 
-        // Event arrived after grace window, but check the file's own write time
         try
         {
             var fileWriteTime = File.GetLastWriteTimeUtc(path);
-            // File was written before or during the build → it's a build artifact
             if (fileWriteTime <= _lastBuildCompletedAt.Add(TimeSpan.FromMilliseconds(500)))
                 return true;
         }
-        catch
-        {
-            // File deleted or inaccessible — not our concern
-        }
+        catch { }
 
         return false;
     }
@@ -161,7 +151,7 @@ public class ReloaderApp
             _debounceTokenSource = new CancellationTokenSource();
             var token = _debounceTokenSource.Token;
 
-            var relativePath = Path.GetRelativePath(_config.ProjectPath, filePath);
+            var relativePath = Path.GetRelativePath(_config.WatchPath, filePath);
             Ui.FileChanged(relativePath, changeType, _config.DebounceSeconds);
 
             _ = Task.Run(async () =>
@@ -189,9 +179,9 @@ public class ReloaderApp
         {
             KillRunningProcess();
 
-            var buildSuccess = await RunDotnetCommandAsync("build", _config.BuildArgs);
+            // Build uses ProjectPath (the .csproj folder)
+            var buildSuccess = await RunDotnetCommandAsync("build", _config.ProjectPath, _config.BuildArgs);
 
-            // Stamp completion time BEFORE re-enabling events
             _lastBuildCompletedAt = DateTime.UtcNow;
 
             if (!buildSuccess)
@@ -206,18 +196,18 @@ public class ReloaderApp
         finally
         {
             lock (_lock) _isBuilding = false;
-            Ui.WatchingMessage(_config.ProjectPath);
+            Ui.WatchingMessage(_config.WatchPath);
         }
     }
 
-    private async Task<bool> RunDotnetCommandAsync(string command, string extraArgs)
+    private async Task<bool> RunDotnetCommandAsync(string command, string targetPath, string extraArgs)
     {
         Ui.BuildStarted(command);
 
         var psi = new ProcessStartInfo
         {
             FileName = "dotnet",
-            Arguments = $"{command} \"{_config.ProjectPath}\" {extraArgs}",
+            Arguments = $"{command} \"{targetPath}\" {extraArgs}",
             RedirectStandardOutput = true,
             RedirectStandardError = true,
             UseShellExecute = false
@@ -242,6 +232,7 @@ public class ReloaderApp
         var psi = new ProcessStartInfo
         {
             FileName = "dotnet",
+            // Run uses ProjectPath (the .csproj folder), not WatchPath
             Arguments = $"run --project \"{_config.ProjectPath}\" --no-build {_config.RunArgs}",
             UseShellExecute = false
         };

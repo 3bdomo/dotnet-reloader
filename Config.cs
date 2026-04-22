@@ -2,7 +2,12 @@ namespace DotnetReloader;
 
 public class ReloaderConfig
 {
+    /// <summary>Root directory to watch for file changes (solution root or project folder)</summary>
+    public string WatchPath { get; set; } = Directory.GetCurrentDirectory();
+
+    /// <summary>The actual .csproj folder passed to dotnet build/run</summary>
     public string ProjectPath { get; set; } = Directory.GetCurrentDirectory();
+
     public int DebounceSeconds { get; set; } = 5;
     public string[] WatchExtensions { get; set; } = [".cs", ".csproj", ".json", ".xml", ".razor", ".html", ".css"];
     public string[] IgnoreFolders { get; set; } = ["bin", "obj", ".git", ".vs", "node_modules"];
@@ -17,10 +22,10 @@ public static class ConfigParser
         var config = new ReloaderConfig();
         bool projectExplicitlySet = false;
 
-        // First positional arg = project path
         if (args.Length > 0 && !args[0].StartsWith("--"))
         {
-            config.ProjectPath = Path.GetFullPath(args[0]);
+            config.WatchPath = Path.GetFullPath(args[0]);
+            config.ProjectPath = config.WatchPath;
             projectExplicitlySet = true;
         }
 
@@ -29,7 +34,8 @@ public static class ConfigParser
             switch (args[i])
             {
                 case "--project" or "-p" when i + 1 < args.Length:
-                    config.ProjectPath = Path.GetFullPath(args[++i]);
+                    config.WatchPath = Path.GetFullPath(args[++i]);
+                    config.ProjectPath = config.WatchPath;
                     projectExplicitlySet = true;
                     break;
 
@@ -64,35 +70,39 @@ public static class ConfigParser
             }
         }
 
-        // If no project was explicitly given, try to resolve it automatically
         if (!projectExplicitlySet)
-            config.ProjectPath = ResolveProjectPath(config.ProjectPath);
+            ResolveProjectPath(config);
 
         return config;
     }
 
     /// <summary>
+    /// Sets WatchPath = solution root (for FSW), ProjectPath = .csproj folder (for build/run).
     /// Resolution order:
-    ///   1. Current directory has a .csproj → use it directly
-    ///   2. Current directory has a .sln → find a subfolder whose name matches the solution name
-    ///   3. Fallback: find a .csproj whose filename matches the solution name
-    ///   4. Nothing found → return base path (will show a clear error at startup)
+    ///   1. .csproj in current dir → both paths are the same
+    ///   2. .sln found → WatchPath = sln root, ProjectPath = matched .csproj folder
+    ///   3. Nothing found → both stay as current directory
     /// </summary>
-    private static string ResolveProjectPath(string basePath)
+    private static void ResolveProjectPath(ReloaderConfig config)
     {
-        // 1. .csproj directly in current directory
+        var basePath = config.WatchPath;
+
+        // 1. .csproj directly in current directory — no split needed
         var directCsproj = Directory.GetFiles(basePath, "*.csproj", SearchOption.TopDirectoryOnly);
         if (directCsproj.Length > 0)
-            return basePath;
+        {
+            config.ProjectPath = basePath;
+            return;
+        }
 
         // 2. Look for a .sln
         var slnFiles = Directory.GetFiles(basePath, "*.sln", SearchOption.TopDirectoryOnly);
         if (slnFiles.Length == 0)
-            return basePath;
+            return;
 
         var slnName = Path.GetFileNameWithoutExtension(slnFiles[0]);
 
-        // Match by folder name — most common convention: MyApp.sln → /MyApp/MyApp.csproj
+        // Match by folder name: MyApp.sln → .../MyApp/MyApp.csproj
         var matchByFolder = Directory
             .GetFiles(basePath, "*.csproj", SearchOption.AllDirectories)
             .FirstOrDefault(f =>
@@ -103,11 +113,13 @@ public static class ConfigParser
 
         if (matchByFolder != null)
         {
-            Ui.ResolvedFromSolution(slnName, matchByFolder);
-            return Path.GetDirectoryName(matchByFolder)!;
+            config.WatchPath = basePath;                              // watch the whole solution
+            config.ProjectPath = Path.GetDirectoryName(matchByFolder)!; // run the matched project
+            Ui.ResolvedFromSolution(slnName, config.ProjectPath);
+            return;
         }
 
-        // Match by .csproj filename — e.g. MyApp.sln → /src/MyApp.csproj
+        // Match by .csproj filename: MyApp.sln → .../src/MyApp.csproj
         var matchByFileName = Directory
             .GetFiles(basePath, "*.csproj", SearchOption.AllDirectories)
             .FirstOrDefault(f =>
@@ -118,11 +130,10 @@ public static class ConfigParser
 
         if (matchByFileName != null)
         {
-            Ui.ResolvedFromSolution(slnName, matchByFileName);
-            return Path.GetDirectoryName(matchByFileName)!;
+            config.WatchPath = basePath;
+            config.ProjectPath = Path.GetDirectoryName(matchByFileName)!;
+            Ui.ResolvedFromSolution(slnName, config.ProjectPath);
         }
-
-        return basePath;
     }
 
     private static void PrintHelp()
@@ -144,8 +155,8 @@ public static class ConfigParser
 
             AUTO-RESOLUTION (when no project is specified):
               1. Looks for a .csproj in the current directory
-              2. Looks for a .sln and finds a project matching the solution name
-              3. Falls back to the current directory
+              2. Looks for a .sln → watches solution root, runs matched project
+              3. Falls back to current directory
 
             EXAMPLES:
               dotnet-reloader                          # auto-resolve
