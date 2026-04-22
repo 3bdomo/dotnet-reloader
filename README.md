@@ -101,7 +101,4 @@ dotnet-reloader --help
 - If app does not stop cleanly, check for child processes spawned outside the process tree.
 - If your build requires custom settings, pass them via `--build-args`.
 
-## License
-
-Add your preferred license file and update this section.
 

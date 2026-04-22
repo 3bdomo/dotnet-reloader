@@ -1,6 +1,10 @@
-# Build output
-bin/
-obj/
+# Build output (all projects)
+**/bin/
+**/obj/
+
+# IDE folders
+**/.idea/
+**/.vs/
 
 # User-specific files
 *.user
@@ -8,11 +12,7 @@ obj/
 *.suo
 *.userprefs
 
-# IDE folders
-.vs/
-.idea/
-
-# NuGet and tooling
+# NuGet and tooling artifacts
 *.nupkg
 *.snupkg
 packages/
@@ -24,4 +24,3 @@ packages/
 # OS files
 Thumbs.db
 Desktop.ini
-
