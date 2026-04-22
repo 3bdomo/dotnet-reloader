@@ -31,12 +31,12 @@ public class ReloaderApp
     {
         Console.CancelKeyPress += OnCancelKeyPress;
 
-        UI.PrintBanner();
-        UI.PrintConfig(_config);
+        Ui.PrintBanner();
+        Ui.PrintConfig(_config);
 
         if (!Directory.Exists(_config.ProjectPath))
         {
-            UI.Error($"Project path not found: {_config.ProjectPath}");
+            Ui.Error($"Project path not found: {_config.ProjectPath}");
             Environment.Exit(1);
         }
 
@@ -47,7 +47,7 @@ public class ReloaderApp
         await BuildAndRunAsync();
 
         using var watcher = CreateWatcher();
-        UI.WatchingMessage(_config.ProjectPath);
+        Ui.WatchingMessage(_config.ProjectPath);
 
         await Task.Delay(Timeout.Infinite);
     }
@@ -162,7 +162,7 @@ public class ReloaderApp
             var token = _debounceTokenSource.Token;
 
             var relativePath = Path.GetRelativePath(_config.ProjectPath, filePath);
-            UI.FileChanged(relativePath, changeType, _config.DebounceSeconds);
+            Ui.FileChanged(relativePath, changeType, _config.DebounceSeconds);
 
             _ = Task.Run(async () =>
             {
@@ -196,23 +196,23 @@ public class ReloaderApp
 
             if (!buildSuccess)
             {
-                UI.BuildFailed();
+                Ui.BuildFailed();
                 return;
             }
 
-            UI.BuildSuccess();
+            Ui.BuildSuccess();
             await StartRunProcessAsync();
         }
         finally
         {
             lock (_lock) _isBuilding = false;
-            UI.WatchingMessage(_config.ProjectPath);
+            Ui.WatchingMessage(_config.ProjectPath);
         }
     }
 
     private async Task<bool> RunDotnetCommandAsync(string command, string extraArgs)
     {
-        UI.BuildStarted(command);
+        Ui.BuildStarted(command);
 
         var psi = new ProcessStartInfo
         {
@@ -224,8 +224,8 @@ public class ReloaderApp
         };
 
         using var process = new Process { StartInfo = psi };
-        process.OutputDataReceived += (_, e) => { if (e.Data != null) UI.BuildOutput(e.Data); };
-        process.ErrorDataReceived += (_, e) => { if (e.Data != null) UI.BuildError(e.Data); };
+        process.OutputDataReceived += (_, e) => { if (e.Data != null) Ui.BuildOutput(e.Data); };
+        process.ErrorDataReceived += (_, e) => { if (e.Data != null) Ui.BuildError(e.Data); };
 
         process.Start();
         process.BeginOutputReadLine();
@@ -237,7 +237,7 @@ public class ReloaderApp
 
     private async Task StartRunProcessAsync()
     {
-        UI.RunStarted(_config.ProjectPath);
+        Ui.RunStarted(_config.ProjectPath);
 
         var psi = new ProcessStartInfo
         {
@@ -258,7 +258,7 @@ public class ReloaderApp
 
         try
         {
-            UI.KillingProcess(_runningProcess.Id);
+            Ui.KillingProcess(_runningProcess.Id);
             _runningProcess.Kill(entireProcessTree: true);
             _runningProcess.WaitForExit(3000);
             _runningProcess.Dispose();
@@ -266,14 +266,14 @@ public class ReloaderApp
         }
         catch (Exception ex)
         {
-            UI.Warning($"Could not kill process: {ex.Message}");
+            Ui.Warning($"Could not kill process: {ex.Message}");
         }
     }
 
     private void OnCancelKeyPress(object? sender, ConsoleCancelEventArgs e)
     {
         e.Cancel = true;
-        UI.Shutdown();
+        Ui.Shutdown();
         KillRunningProcess();
         Environment.Exit(0);
     }

@@ -1,8 +1,16 @@
 namespace DotnetReloader;
 
-public static class UI
+public static class Ui
 {
     private static readonly string Separator = new string('─', 60);
+
+    public static void ResolvedFromSolution(string slnName, string csprojPath)
+    {
+        SetColor(ConsoleColor.DarkGray);
+        Console.WriteLine($"  ↳ No project specified. Found solution '{slnName}.sln'");
+        Console.WriteLine($"    Resolved project: {csprojPath}");
+        Reset();
+    }
 
     public static void PrintBanner()
     {
