@@ -74,6 +74,18 @@ dotnet run --project "./dotnet-reloader.csproj" -- "./src/MyApi" --ext .cs,.razo
 
 This project is configured with `PackAsTool=true` and command name `dotnet-reloader`.
 
+### Quick Install (Windows)
+```powershell
+.\update-tool.bat
+```
+
+### Quick Install (Linux/macOS)
+```bash
+chmod +x ./update-tool.sh
+./update-tool.sh
+```
+
+### Manual Install
 ```powershell
 dotnet pack "./dotnet-reloader.csproj" -c Release -o ./nupkg
 dotnet tool install --global DotnetReloader --add-source ./nupkg
@@ -83,6 +95,25 @@ After installation:
 
 ```powershell
 dotnet-reloader --help
+```
+
+### Updating After Code Changes
+
+The `update-tool` scripts handle a complete clean reinstall:
+- ✅ Removes orphaned shell shims
+- ✅ Cleans the tool store folder
+- ✅ Clears NuGet caches
+- ✅ Repacks the latest code
+- ✅ Reinstalls the global tool
+
+**Windows:**
+```powershell
+.\update-tool.bat
+```
+
+**Linux/macOS:**
+```bash
+./update-tool.sh
 ```
 
 ## How It Works
