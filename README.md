@@ -76,13 +76,13 @@ This project is configured with `PackAsTool=true` and command name `dotnet-reloa
 
 ### Quick Install (Windows)
 ```powershell
-.\update-tool.bat
+.\install-tool.bat
 ```
 
 ### Quick Install (Linux/macOS)
 ```bash
-chmod +x ./update-tool.sh
-./update-tool.sh
+chmod +x ./install-tool.sh
+./install-tool.sh
 ```
 
 ### Manual Install
@@ -108,12 +108,12 @@ The `update-tool` scripts handle a complete clean reinstall:
 
 **Windows:**
 ```powershell
-.\update-tool.bat
+.\install-tool.bat
 ```
 
 **Linux/macOS:**
 ```bash
-./update-tool.sh
+./install-tool.sh
 ```
 
 ## How It Works

@@ -9,7 +9,7 @@ public class ReloaderConfig
     public string ProjectPath { get; set; } = Directory.GetCurrentDirectory();
 
     public int DebounceSeconds { get; set; } = 5;
-    public string[] WatchExtensions { get; set; } = [".cs", ".csproj", ".json", ".xml", ".razor", ".html", ".css"];
+    public string[] WatchExtensions { get; set; } = [".cs", ".csproj", ".json", ".xml", ".razor", ".html", ".css","cshtml"];
     public string[] IgnoreFolders { get; set; } = ["bin", "obj", ".git", ".vs", "node_modules"];
     public string BuildArgs { get; set; } = "";
     public string RunArgs { get; set; } = "";
